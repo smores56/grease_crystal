@@ -1,0 +1,18 @@
+version: 1.0
+shards:
+  db:
+    github: crystal-lang/crystal-db
+    version: 0.9.0
+
+  dotenv:
+    github: gdotdesign/cr-dotenv
+    version: 0.7.0
+
+  graphql:
+    gitlab: everbase/graphql
+    commit: b0b2450962c816f092be98b8d5b39852ffb0d9d5
+
+  mysql:
+    github: crystal-lang/crystal-mysql
+    version: 0.11.0
+

@@ -1,0 +1,23 @@
+name: grease
+version: 0.1.0
+
+authors:
+  - Sam Mohr <sam@mohr.codes>
+
+targets:
+  grease:
+    main: src/grease.cr
+
+crystal: 0.33.0
+
+license: MIT
+
+dependencies:
+  dotenv:
+    github: gdotdesign/cr-dotenv
+  graphql:
+    gitlab: everbase/graphql
+  db:
+    github: crystal-lang/crystal-db
+  mysql:
+    github: crystal-lang/crystal-mysql
