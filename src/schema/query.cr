@@ -62,7 +62,7 @@ class Query
 
   @[GraphQL::Field]
   def meeting_minutes(id : Int32) : Models::Minutes
-    Models::Minutes.with_id id
+    Models::Minutes.with_id! id
   end
 
   @[GraphQL::Field]
@@ -77,7 +77,7 @@ class Query
 
   @[GraphQL::Field]
   def semester(name : String) : Models::Semester
-    Models::Semester.with_name name
+    Models::Semester.with_name! name
   end
 
   @[GraphQL::Field]
@@ -102,7 +102,7 @@ class Query
 
   @[GraphQL::Field]
   def song(id : Int32) : Models::Song
-    Models::Song.with_id id
+    Models::Song.with_id! id
   end
 
   @[GraphQL::Field]

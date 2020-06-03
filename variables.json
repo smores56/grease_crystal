@@ -1,0 +1,24 @@
+{
+    "member": {
+        "email": "sam@mohr.codes",
+        "firstName": "Samuel",
+        "preferredName": "Sam",
+        "lastName": "Mohr",
+        "passHash": "482c811da5d5b4bc6d497ffa98491e38",
+        "phoneNumber": "4047751184",
+        "picture": null,
+        "passengers": 3,
+        "location": "Midtown",
+        "onCampus": false,
+        "about": null,
+        "major": null,
+        "minor": null,
+        "hometown": "ATL",
+        "arrivedAtTech": 2015,
+        "gatewayDrug": "Scott Nealon",
+        "conflicts": null,
+        "dietaryRestrictions": "N/A",
+        "enrollment": "CLUB",
+        "section": null
+    }
+}

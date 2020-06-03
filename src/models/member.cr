@@ -1,6 +1,11 @@
 require "graphql"
-require "./models"
+require "mysql"
+require "uuid"
+require "crypto/bcrypt"
 require "./grades"
+require "../email"
+
+Password = Crypto::Bcrypt::Password
 
 module Models
   @[GraphQL::Object]
@@ -46,24 +51,91 @@ module Models
       CONN.query_all "SELECT * FROM #{@@table_name} ORDER BY last_name, first_name", as: Member
     end
 
+    def self.active_during(semester_name)
+      CONN.query_all "SELECT * FROM #{@@table_name} WHERE email IN \
+        (SELECT member FROM #{ActiveSemester.table_name} WHERE semester = ?)", semester_name, as: Member
+    end
+
+    def self.valid_login?(form)
+      pass_hash = CONN.query_one? "SELECT pass_hash FROM #{@@table_name} \
+        WHERE email = ?", form.email, as: String
+      pass_hash && Crypto::Bcrypt::Password.new(raw_hash: pass_hash).verify(form.pass_hash)
+    end
+
     def is_active?
       get_semester(Semester.current.name)
     end
 
     def get_semester(semester_name)
-      @semesters = ActiveSemester.all_for_member @email if @semesters.nil?
-      @semesters.not_nil![semester_name]?
+      ActiveSemester.for_semester @email, semester_name
     end
 
     def get_semester!(semester_name)
       get_semester(semester_name) || raise "#{full_name} was not active during #{semester_name}"
     end
 
-    # def roles
-    #   Conn.
-    # end
+    def self.register(form)
+      if CONN.query_one? "SELECT email FROM #{@@table_name} WHERE email = ?", form.email, as: String
+        raise "Another member already has the email #{form.email}"
+      end
 
-    # has_many roles : Role
+      pass_hash = Password.create(form.pass_hash, cost: 10).to_s
+
+      CONN.exec "INSERT INTO #{@@table_name} \
+        (email, first_name, preferred_name, last_name, pass_hash, phone_number, \
+         picture, passengers, location, on_campus, about, major, minor, hometown, \
+         arrived_at_tech, gateway_drug, conflicts, dietary_restrictions)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        form.email, form.first_name, form.preferred_name, form.last_name, pass_hash,
+        form.phone_number, form.picture, form.passengers, form.location, form.on_campus,
+        form.about, form.major, form.minor, form.hometown, form.arrived_at_tech,
+        form.gateway_drug, form.conflicts, form.dietary_restrictions
+    end
+
+    def self.register_for_current_semester(member, form)
+      ActiveSemester.create_for_member member, form, Semester.current
+
+      CONN.exec "UPDATE #{@@table_name} \
+        SET location = ?, on_campus = ?, conflicts = ?, dietary_restrictions = ? \
+        WHERE email = ?", form.location, form.on_campus, form.conflicts,
+        form.dietary_restrictions, member.email
+    end
+
+    def self.update(member, form, as_self)
+      if member.email != form.email
+        existing_email = CONN.query_one? "SELECT email FROM #{@@table_name} WHERE email = ?", form.email, as: String
+        raise "Cannot change email to #{form.email}, as another member has that email" if existing_email
+      end
+
+      pass_hash = if member_hash = form.pass_hash
+                    if as_self
+                      Password.create(member_hash, cost: 10).to_s
+                    else
+                      raise "Only members themselves can change their own passwords"
+                    end
+                  else
+                    member.pass_hash
+                  end
+
+      CONN.exec "UPDATE #{@@table_name} SET \
+        email = ?, first_name = ?, preferred_name = ?, last_name = ?, \
+        phone_number = ?, picture = ?, passengers = ?, location = ?, \
+        about = ?, major = ?, minor = ?, hometown = ?, arrived_at_tech = ?, \
+        gateway_drug = ?, conflicts = ?, dietary_restrictions = ?, pass_hash = ?",
+        form.email, form.first_name, form.preferred_name, form.last_name,
+        form.phone_number, form.picture, form.passengers, form.location,
+        form.about, form.major, form.minor, form.hometown, form.arrived_at_tech,
+        form.gateway_drug, form.conflicts, form.dietary_restrictions, pass_hash
+
+      ActiveSemester.update form.email, Semester.current, form.enrollment, form.section
+    end
+
+    def self.delete(email)
+      # ensure member exists
+      Member.with_email email
+
+      CONN.exec "DELETE FROM #{@@table_name} WHERE email = ?", email
+    end
 
     @[GraphQL::Field(description: "The member's email, which must be unique")]
     def email : String
@@ -155,6 +227,11 @@ module Models
       get_semester(Semester.current.name).try &.semester
     end
 
+    @[GraphQL::Field(description: "The name of the semester they were active during")]
+    def semesters : Array(Models::ActiveSemester)
+      (ActiveSemester.all_for_member @email).sort_by &.semester
+    end
+
     @[GraphQL::Field(description: "Whether they were in the class or the club")]
     def enrollment : Models::ActiveSemester::Enrollment?
       get_semester(Semester.current.name).try &.enrollment
@@ -167,12 +244,12 @@ module Models
 
     @[GraphQL::Field(description: "The officer positions currently held by the member")]
     def positions : Array(String)
-      [] of String
+      (Role.for_member @email).map &.name
     end
 
     @[GraphQL::Field(description: "The permissions held currently by the member")]
     def permissions : Array(Models::MemberPermission)
-      [] of MemberPermission
+      MemberPermission.for_member @email
     end
 
     @[GraphQL::Field(description: "The grades for the member in the given semester (default the current semester)")]
@@ -182,7 +259,7 @@ module Models
 
     @[GraphQL::Field(description: "All of the member's transactions for their entire time in Glee Club")]
     def transaction : Array(Models::ClubTransaction)
-      [] of Models::ClubTransaction
+      ClubTransaction.for_member_during_semester @email, Semester.current.name
     end
   end
 
@@ -196,6 +273,17 @@ module Models
     enum Enrollment
       CLASS
       CLUB
+
+      def self.parse(val)
+        case val
+        when "CLASS"
+          CLASS
+        when "CLUB"
+          CLUB
+        else
+          raise "Unknown enrollment variant: #{val}"
+        end
+      end
     end
 
     DB.mapping({
@@ -206,15 +294,52 @@ module Models
     })
 
     def self.all_for_member(email)
-      semesters = CONN.query_all "SELECT * FROM #{@@table_name} WHERE member = ?", email, as: ActiveSemester
-      semester_map = {} of String => ActiveSemester
-      semesters.each { |semester| semester_map[semester.semester] = semester }
-
-      semester_map
+      CONN.query_all "SELECT * FROM #{@@table_name} WHERE member = ?", email, as: ActiveSemester
     end
 
-    def self.for_semester(email, semester)
-      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE member = ? AND SEMESTER = ?", email, semester, as: ActiveSemester
+    def self.for_semester(email, semester_name)
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE member = ? AND SEMESTER = ?",
+        email, semester_name, as: ActiveSemester
+    end
+
+    def self.create_for_member(member, form, semester)
+      if member.get_semester(semester.name)
+        raise "#{member.full_name} is already active for the current semester"
+      end
+
+      CONN.exec "INSERT INTO #{@@table_name} (member, semester, enrollment, section)
+        VALUES (?, ?, ?, ?)", member.email, semester.name, form.enrollment, form.section
+    end
+
+    def self.update(email, semester_name, enrollment, section)
+      active_semester = for_semester email, semester_name
+
+      if enrollment
+        if active_semester
+          CONN.exec "UPDATE #{@@table_name} SET enrollment = ?, section = ? \
+            WHERE member = ? AND semester = ?", enrollment, section, email, semester_name
+        else
+          CONN.exec "INSERT INTO #{@@table_name} (member, semester, enrollment, section)
+            VALUES (?, ?, ?, ?)", email, semester_name, enrollment, section
+        end
+      elsif active_semester
+        CONN.exec "DELETE FROM #{@@table_name} WHERE member = ? AND SEMESTER = ?", email, semester_name
+      end
+    end
+
+    @[GraphQL::Field(description: "The grades for the member in the given semester")]
+    def grades : Models::Grades
+      Grades.for_member (Member.with_email @member), (Semester.with_name! @semester)
+    end
+
+    @[GraphQL::Field]
+    def semester : String
+      @semester
+    end
+
+    @[GraphQL::Field]
+    def enrollment : Models::ActiveSemester::Enrollment
+      @enrollment
     end
   end
 end

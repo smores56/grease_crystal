@@ -21,15 +21,19 @@ module CGI
   }
 
   def self.request_from_stdin
-    method = ENV["REQUEST_METHOD"]? || raise "REQUEST_METHOD is required"
-    path = ENV["SCRIPT_NAME"]? || raise "SCRIPT_NAME is required"
+    length = ENV["CONTENT_LENGTH"]?.try &.to_i? || 0
+    body = Bytes.new length
+    STDIN.read_fully body
+
+    method = ENV["REQUEST_METHOD"]? || "GET"
+    path = ENV["PATH_INFO"]? || raise "PATH_INFO is required"
     uri = if query = ENV["QUERY_STRING"]?
             "#{path}?#{query}"
           else
             path
           end
 
-    return HTTP::Request.new(method, uri, parse_headers, STDIN, ENV["SERVER_PROTOCOL"]? || "HTTP/1.1")
+    return HTTP::Request.new method, uri, parse_headers, body, (ENV["SERVER_PROTOCOL"]? || "HTTP/1.1")
   end
 
   def self.parse_headers
@@ -49,9 +53,13 @@ module CGI
     return headers
   end
 
-  def self.response_to_stdout(json : IO | String, status : HTTP::Status)
+  def self.response_to_stdout(body, content_type, status)
     STDOUT << "Status: #{status.code} #{status.description}\n"
-    STDOUT << "content-type: application/json\n\n"
-    STDOUT << json << "\n" # TODO: remove this
+    STDOUT << "Content-type: #{content_type}\n\n"
+    STDOUT << body
+  end
+
+  def self.handle(&block)
+    CGI.response_to_stdout(*yield CGI.request_from_stdin)
   end
 end

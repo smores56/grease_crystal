@@ -1,6 +1,4 @@
 require "graphql"
-require "./db"
-require "./models"
 require "./event"
 
 module Models
@@ -89,18 +87,17 @@ module Models
     def self.for_each_week(events_with_attendance : Array({Event, Attendance?}), &block)
       return if events_with_attendance.empty?
 
-      one_week = Time::Span.new 7, 0, 0, 0
       start = events_with_attendance.first[0].call_time.at_beginning_of_week
       finish = events_with_attendance[-1][0].call_time
 
       while start <= finish
         week = events_with_attendance.select do |(event, attendance)|
-          event.call_time >= start && event.call_time < (start + one_week)
+          event.call_time >= start && event.call_time < start.shift weeks: 1
         end
 
         yield WeekOfEvents.new week unless week.empty?
 
-        start += one_week
+        start = start.shift weeks: 1
       end
     end
 

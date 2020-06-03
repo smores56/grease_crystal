@@ -1,6 +1,5 @@
 require "graphql"
 require "mysql"
-require "./db"
 require "./event"
 
 module Models
@@ -33,12 +32,69 @@ module Models
       G_FLAT
       G
       G_SHARP
+
+      def self.mapping
+        {
+          "A_FLAT"  => A_FLAT,
+          "A"       => A,
+          "A_SHARP" => A_SHARP,
+          "B_FLAT"  => B_FLAT,
+          "B"       => B,
+          "B_SHARP" => B_SHARP,
+          "C_FLAT"  => C_FLAT,
+          "C"       => C,
+          "C_SHARP" => C_SHARP,
+          "D_FLAT"  => D_FLAT,
+          "D"       => D,
+          "D_SHARP" => D_SHARP,
+          "E_FLAT"  => E_FLAT,
+          "E"       => E,
+          "E_SHARP" => E_SHARP,
+          "F_FLAT"  => F_FLAT,
+          "F"       => F,
+          "F_SHARP" => F_SHARP,
+          "G_FLAT"  => G_FLAT,
+          "G"       => G,
+          "G_SHARP" => G_SHARP,
+        }
+      end
+
+      def to_rs
+        Pitch.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(val)
+        Pitch.mapping[val.upcase]? || raise "Invalid pitch returned from database: #{val}"
+      end
+
+      def self.parse(val)
+        Pitch.mapping[val]? || raise "Invalid pitch variant provided: #{val}"
+      end
     end
 
     @[GraphQL::Enum]
     enum Mode
       MAJOR
       MINOR
+
+      def self.mapping
+        {
+          "MAJOR" => MAJOR,
+          "MINOR" => MINOR,
+        }
+      end
+
+      def to_rs
+        Mode.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(val)
+        Mode.mapping[val.upcase]? || raise "Invalid song mode returned from database: #{val}"
+      end
+
+      def self.parse(val)
+        Mode.mapping[val]? || raise "Invalid song mode variant provided: #{val}"
+      end
     end
 
     DB.mapping({
@@ -55,9 +111,12 @@ module Models
       CONN.query_all "SELECT * FROM #{@@table_name} ORDER BY title", as: Song
     end
 
-    def self.with_id(song_id)
-      song = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", song_id, as: Song
-      song || raise "No song with id #{song_id}"
+    def self.with_id(id)
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: Song
+    end
+
+    def self.with_id!(id)
+      (with_id id) || raise "No song with id #{id}"
     end
 
     def self.setlist_for_event(event_id)
@@ -68,15 +127,33 @@ module Models
     end
 
     def self.all_public
-      all_links = SongLink.all
+      all_links = SongLink.all.select { |link| link.type == SongLink::PERFORMANCES }
 
       Song.all.map do |song|
         videos = all_links
-          .select { |link| link.type == SongLink::PERFORMANCES }
+          .select { |link| link.song == song.id }
           .map { |link| PublicVideo.new link.name, link.target }
 
         PublicSong.new song.title, song.current, videos
       end
+    end
+
+    def self.create(form)
+      CONN.exec "INSERT INTO #{@@table_name} (title, info) \
+        VALUES (?, ?)", form.title, form.info
+
+      CONN.query_one "SELECT id FROM #{@@table_name} ORDER BY id DESC", as: Int32
+    end
+
+    def update(form)
+      CONN.exec "SET #{@@table_name} \
+        title = ?, current = ?, info = ?, key = ?, starting_pitch = ?, mode = ?
+        WHERE id = ?", form.title, form.current, form.info, form.key.try &.to_rs,
+        form.starting_pitch.try &.to_rs, form.mode.try &.to_rs, @id
+    end
+
+    def delete
+      CONN.exec "DELETE #{@@table_name} WHERE id = ?", @id
     end
 
     @[GraphQL::Field(description: "The ID of the song")]

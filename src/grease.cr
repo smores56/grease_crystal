@@ -1,31 +1,18 @@
-require "json"
-require "graphql"
 require "http/status"
-
 require "./cgi"
-require "./schema/*"
-require "./models/db"
+require "./schema/handler"
 
-schema = GraphQL::Schema.new Query.new, Mutation.new
+CGI.handle do |request|
+  # TODO: endpoint to upload frontend (as tar.gz)
 
-begin
-  request = CGI.request_from_stdin
-  body = request.body || raise "JSON body is required"
-  json = JSON.parse body
-
-  context = UserContext.new request.headers["TOKEN"]?
-
-  query = json["query"].as_s? || raise "query was not provided"
-  variables = json["variables"]?.as(Hash(String, JSON::Any)?)
-  operation_name = json["operationName"]?.as(String?)
-
-  json = schema.execute(query, variables, operation_name, context)
-  TRANSACTION.commit
-
-  CGI.response_to_stdout(json, HTTP::Status::OK)
+  if request.path == "/graphiql"
+    {Graphiql.html, "text/html", HTTP::Status::OK}
+  else
+    json = graphql_response request
+    TRANSACTION.commit
+    {json, "application/json", HTTP::Status::OK}
+  end
 rescue exception
   TRANSACTION.rollback
-
-  error_json = {"error": exception.to_s}.to_json
-  CGI.response_to_stdout(error_json, HTTP::Status::BAD_REQUEST)
+  {exception.to_s, "text/plain", HTTP::Status::BAD_REQUEST}
 end

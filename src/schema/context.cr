@@ -21,8 +21,8 @@ class UserContext < GraphQL::Context
   end
 
   def able_to!(permission, event_type = nil)
-    permission = MemberPermission.new permission, event_type
+    permission = Models::MemberPermission.new permission, event_type
 
-    raise "Permission #{permission} required" unless @user.permissions.includes? permission
+    raise "Permission #{permission} required" unless user!.permissions.includes? permission
   end
 end
