@@ -79,7 +79,7 @@ module Models
 
     @[GraphQL::Field(description: "The email of the member holding the role")]
     def member : Models::Member
-      Member.with_email @member
+      Member.with_email! @member
     end
 
     @[GraphQL::Field(description: "The name of the role being held")]

@@ -10,7 +10,7 @@ module Models
     })
 
     def self.for_token(token)
-      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE key = ?", token, as: Session
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE `key` = ?", token, as: Session
     end
 
     def self.for_token!(token)
@@ -18,12 +18,11 @@ module Models
     end
 
     def self.create(email, token)
-      CONN.exec "INSERT INTO #{@@table_name} (member, key) VALUES (?, ?)", email, token
+      CONN.exec "INSERT INTO #{@@table_name} (member, `key`) VALUES (?, ?)", email, token
     end
 
     def self.get_or_generate_token(email)
-      # ensure member exists
-      Member.with_email email
+      Member.with_email! email
 
       session = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE member = ?", email, as: Session
       return session.key if session
@@ -39,7 +38,7 @@ module Models
     end
 
     def self.generate_for_forgotten_password(email)
-      Member.with_email email # check that member exists
+      Member.with_email! email
 
       CONN.exec "DELETE FROM #{@@table_name} WHERE member = ?", email
       new_token = "#{UUID.random.to_s[0...32]}X#{Time.local.to_unix_ms}"

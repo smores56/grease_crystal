@@ -30,10 +30,8 @@ module Permissions
   EDIT_ALL_EVENTS = "edit-all-events"
   DELETE_EVENT    = "delete-event"
 
-  VIEW_ATTENDANCE             = "view-attendance"
-  VIEW_ATTENDANCE_OWN_SECTION = "view-attendance-own-section"
   EDIT_ATTENDANCE             = "edit-attendance"
   EDIT_ATTENDANCE_OWN_SECTION = "edit-attendance-own-section"
 
-  EDIT_CARPOOL = "edit-carpool"
+  EDIT_CARPOOLS = "edit-carpool"
 end

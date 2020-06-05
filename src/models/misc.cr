@@ -34,9 +34,7 @@ module Models
     end
 
     def self.create(form)
-      if existing = with_name form.name
-        raise "A semester already exists named #{form.name}"
-      end
+      raise "A semester already exists named #{form.name}" if with_name form.name
 
       CONN.exec "INSERT INTO #{@@table_name} \
         (name, start_date, end_date, gig_requirement) \
@@ -119,27 +117,28 @@ module Models
     end
 
     def self.with_name(name)
-      doc = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE name = ?", name, as: Document
-      doc || raise "No document named #{name}"
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE name = ?", name, as: Document
+    end
+
+    def self.with_name!(name)
+      (with_name name) || raise "No document named #{name}"
     end
 
     def self.create(name, url)
-      if CONN.query_one? "SELECT name FROM #{@@table_name} WHERE name = ?", name, as: String
-        raise "A document already exists named #{name}"
-      end
+      existing = CONN.query_one? "SELECT name FROM #{@@table_name} WHERE name = ?", name, as: String
+      raise "A document already exists named #{name}" if existing
 
       CONN.exec "INSERT INTO #{@@table_name} (name, url) VALUES (?, ?)", name, url
     end
 
-    def self.update(name, url)
-      # ensure document exists
-      with_name name
+    def set_url(url)
+      CONN.exec "UPDATE #{@@table_name} SET url = ? WHERE name = ?", url, @name
 
-      CONN.exec "UPDATE #{@@table_name} SET url = ? WHERE name = ?", url, name
+      @url = url
     end
 
-    def self.delete(name)
-      CONN.exec "DELETE FROM #{@@table_name} WHERE name = ?", name
+    def delete
+      CONN.exec "DELETE FROM #{@@table_name} WHERE name = ?", @name
     end
 
     @[GraphQL::Field(description: "The name of the document")]
@@ -305,8 +304,8 @@ module Models
     end
 
     @[GraphQL::Field(description: "The private, complete officer notes")]
-    def private : String?
-      @complete
+    def private(context : UserContext) : String?
+      (context.able_to? Permissions::VIEW_COMPLETE_MINUTES) ? @complete : nil
     end
 
     @[GraphQL::Field(description: "The public, redacted notes visible by all members")]
@@ -327,8 +326,11 @@ module Models
     })
 
     def self.with_key(key)
-      var = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE key = ?", key, as: Variable
-      var || raise "No value set at key #{key}"
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE key = ?", key, as: Variable
+    end
+
+    def self.with_key!(key)
+      (with_key key) || raise "No value set at key #{key}"
     end
 
     def self.set(key, value)
@@ -339,8 +341,8 @@ module Models
       end
     end
 
-    def self.unset(key)
-      CONN.exec "DELETE FROM #{@@table_name} WHERE key = ?", key
+    def unset
+      CONN.exec "DELETE FROM #{@@table_name} WHERE key = ?", @key
     end
 
     @[GraphQL::Field(description: "The name of the variable")]

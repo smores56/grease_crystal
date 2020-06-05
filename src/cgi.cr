@@ -33,7 +33,7 @@ module CGI
             path
           end
 
-    return HTTP::Request.new method, uri, parse_headers, body, (ENV["SERVER_PROTOCOL"]? || "HTTP/1.1")
+    HTTP::Request.new method, uri, parse_headers, body, (ENV["SERVER_PROTOCOL"]? || "HTTP/1.1")
   end
 
   def self.parse_headers
@@ -50,7 +50,7 @@ module CGI
       end
     end
 
-    return headers
+    headers
   end
 
   def self.response_to_stdout(body, content_type, status)

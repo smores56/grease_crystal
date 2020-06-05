@@ -177,31 +177,36 @@ module Models
     def self.should_have_attended(event, attendance, week)
       # Lose the full point value if did not attend
       if event.type == Models::Event::OMBUDS
-        {0.0, "You do not lose points for missing an ombuds event"}
+        return {0.0, "You do not lose points for missing an ombuds event"}
       elsif event.type == Models::Event::SECTIONAL && week.attended_sectional?
-        {0.0, "No deduction because you attended a different sectional this week"}
+        return {0.0, "No deduction because you attended a different sectional this week"}
       end
 
       if event.type == Models::Event::SECTIONAL
-        first_missed_sectional = week.first_missed_sectional
-        if first_missed_sectional && first_missed_sectional[0].call_time < event.call_time
-          {0.0, "No deduction because you already lost points for one sectional this week"}
-        end
-
-        last_sectional = week.last_sectional
-        if last_sectional
-          call_time : Time = last_sectional[0].call_time
-          if call_time > event.call_time && call_time > Time.local
-            {0.0, "No deduction because not all sectionals occurred yet"}
-          end
+        if excuse = excused_from_sectional_penalty(event, attendance, week)
+          return excuse
         end
       end
 
       if attendance.approved_absence
         {0.0, "No deduction because an absence request was submitted and approved"}
+      else
+        {-event.points.to_f64, "Full deduction for unexcused absence from event"}
+      end
+    end
+
+    def self.excused_from_sectional_penalty(event, attendance, week)
+      first_missed_sectional = week.first_missed_sectional
+      if first_missed_sectional && first_missed_sectional[0].call_time < event.call_time
+        return {0.0, "No deduction because you already lost points for one sectional this week"}
       end
 
-      {-event.points.to_f64, "Full deduction for unexcused absence from event"}
+      if last_sectional = week.last_sectional
+        call_time : Time = last_sectional[0].call_time
+        if call_time > event.call_time && call_time > Time.local
+          return {0.0, "No deduction because not all sectionals occurred yet"}
+        end
+      end
     end
 
     # Lose points equal to the percentage of the event missed, if they should have attended
@@ -257,8 +262,6 @@ module Models
     end
 
     def is_bonus_event?(event, attendance)
-      sectionals = self.sectionals
-
       event.type == Models::Event::VOLUNTEER_GIG || event.type == Models::Event::OMBUDS ||
         (event.type == Models::Event::OTHER && !attendance.should_attend) ||
         (event.type == Models::Event::SECTIONAL && self.first_missed_sectional.nil?)

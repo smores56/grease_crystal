@@ -42,7 +42,7 @@ module Models
     end
 
     def self.create_for_new_event(event_id)
-      event = Event.with_id event_id
+      event = Event.with_id! event_id
       active_members = Member.active_during event.semester
 
       active_members.each do |member|
@@ -52,8 +52,7 @@ module Models
     end
 
     def self.excuse_unconfirmed(event_id)
-      # ensure event exists
-      Event.with_id event_id
+      Event.with_id! event_id
 
       CONN.exec "UPDATE #{@@table_name} SET should_attend = false \
         WHERE event = ? AND confirmed = false", event_id
@@ -70,7 +69,7 @@ module Models
     end
 
     def self.rsvp_for_event(event_id, member, attending)
-      event = Event.with_id event_id
+      event = Event.with_id! event_id
       attendance = for_member_at_event! member.email, event_id
       event.ensure_no_rsvp_issue! member, attendance
 
@@ -79,9 +78,8 @@ module Models
     end
 
     def self.confirm_for_event(event_id, member)
-      # ensure member exists
-      Event.with_id event_id
-      attendance = for_member_at_event! member.email, event_id
+      Event.with_id! event_id
+      for_member_at_event! member.email, event_id
 
       CONN.exec "UPDATE #{@@table_name} SET should_attend = true, confirmed = true \
         WHERE event = ? AND member = ?", event_id, member.email
@@ -89,7 +87,7 @@ module Models
 
     @[GraphQL::Field(description: "The email of the member this attendance belongs to")]
     def member : Models::Member
-      Member.with_email @member
+      Member.with_email! @member
     end
 
     @[GraphQL::Field(description: "Whether the member is expected to attend the event")]
@@ -119,7 +117,7 @@ module Models
 
     @[GraphQL::Field]
     def rsvp_issue : String?
-      event = Event.with_id @event
+      event = Event.with_id! @event
       event.rsvp_issue_for member, self
     end
 
@@ -207,12 +205,12 @@ module Models
 
     @[GraphQL::Field(description: "The member that requested an absence")]
     def member : Models::Member
-      Member.with_email @member
+      Member.with_email! @member
     end
 
     @[GraphQL::Field(description: "The event they requested absence from")]
     def event : Models::Event
-      Event.with_id @event
+      Event.with_id! @event
     end
 
     @[GraphQL::Field(name: "time", description: "The time this request was placed")]

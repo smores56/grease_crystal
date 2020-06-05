@@ -20,8 +20,7 @@ module Models
     end
 
     def self.update(event_id, updated_carpools)
-      # ensure event exists
-      event = Event.with_id event_id
+      Event.with_id! event_id
 
       CONN.exec "DELETE FROM #{@@table_name} WHERE event = ?", event_id
 
@@ -37,7 +36,7 @@ module Models
 
     @[GraphQL::Field(name: "driver", description: "The driver of the carpool")]
     def full_driver : Models::Member
-      Member.with_email @driver
+      Member.with_email! @driver
     end
 
     @[GraphQL::Field(description: "The passengers of the carpool")]

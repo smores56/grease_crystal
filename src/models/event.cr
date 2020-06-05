@@ -56,8 +56,11 @@ module Models
     })
 
     def self.with_id(id)
-      event = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: Event
-      event || raise "No event with id #{id}"
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: Event
+    end
+
+    def self.with_id!(id)
+      (with_id id) || raise "No event with id #{id}"
     end
 
     def self.for_member_with_attendance(email, semester_name) : Array({Event, Attendance?})
@@ -114,7 +117,7 @@ module Models
       repeat_until = if period == Input::Period::NO
                        form.event.call_time
                      else
-                       repeat_until = repeat_until || raise "Must supply a repeat until time if repeat is supplied"
+                       repeat_until || raise "Must supply a repeat until time if repeat is supplied"
                      end
 
       e = form.event
@@ -145,7 +148,7 @@ module Models
         end
       end
 
-      GigRequest.set_status from_request.id, GigRequest::Status::ACCEPTED if from_request
+      from_request.set_status GigRequest::Status::ACCEPTED if from_request
 
       new_ids.first
     end
@@ -181,7 +184,7 @@ module Models
     end
 
     def self.update(id, form)
-      event = Event.with_id id
+      event = Event.with_id! id
 
       raise "Gig fields must be present when updating gig events" if event.gig && !form.gig
 
@@ -206,8 +209,7 @@ module Models
     end
 
     def self.delete(id)
-      # ensure event exists
-      Event.with_id id
+      Event.with_id! id
 
       CONN.exec "DELETE FROM #{@@table_name} WHERE id = ?", id
     end
@@ -401,8 +403,11 @@ module Models
     })
 
     def self.with_id(id)
-      request = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: GigRequest
-      request || raise "No gig request with ID #{id}"
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: GigRequest
+    end
+
+    def self.with_id!(id)
+      (with_id id) || raise "No gig request with ID #{id}"
     end
 
     def self.all
@@ -420,19 +425,19 @@ module Models
       CONN.query_one "SELECT id FROM #{@@table_name} ORDER BY id DESC", as: Int32
     end
 
-    def self.set_status(id, status)
-      request = with_id id
-
-      if status == request.status
+    def set_status(status)
+      if @status == status
         return
-      elsif request.status == Status::ACCEPTED
+      elsif @status == Status::ACCEPTED
         raise "Cannot change the status of an accepted gig request"
-      elsif request.status == Status::DISMISSED && status == Status::ACCEPTED
+      elsif @status == Status::DISMISSED && status == Status::ACCEPTED
         raise "Cannot directly accept a gig request if it is dismissed (please reopen it first)"
-      elsif request.status == Status::PENDING && status == Status::ACCEPTED && request.event.nil?
+      elsif @status == Status::PENDING && status == Status::ACCEPTED && @event.nil?
         raise "Must create the event for the gig request first before marking it as accepted"
       else
-        CONN.exec "UPDATE #{@@table_name} SET status = ? WHERE id = ?", status, id
+        CONN.exec "UPDATE #{@@table_name} SET status = ? WHERE id = ?", status, @id
+
+        @status = status
       end
     end
 
@@ -463,7 +468,7 @@ module Models
 
     @[GraphQL::Field(description: "If and when an event is created from a request, this is the event")]
     def event : Models::Event?
-      @event.try { |id| Event.with_id id }
+      @event.try { |id| Event.with_id! id }
     end
 
     @[GraphQL::Field(description: "The name of the contact for the potential event")]
@@ -499,6 +504,135 @@ module Models
     @[GraphQL::Field(description: "The current status of whether the request was accepted")]
     def status : Models::GigRequest::Status
       @status
+    end
+  end
+
+  @[GraphQL::Object]
+  class PublicEvent
+    include GraphQL::ObjectType
+
+    def initialize(
+      @id : Int32,
+      @name : String,
+      @time : Time,
+      @location : String,
+      @summary : String,
+      @description : String,
+      @invite : String
+    )
+    end
+
+    # def self.all_for_current_semester
+    #   events = CONN.query_all "SELECT * FROM #{Event.table_name} WHERE id IN \
+    #     (SELECT event FROM #{Gig.table_name} WHERE public = true) \
+    #     ORDER BY call_time", as: Event
+
+    #   events.map do |event|
+    #     calendar_url = build_calendar_url event
+    # pub fn to_public(event: Event, gig: Gig) -> GreaseResult<PublicEvent> {
+    #     if !gig.public {
+    #         return Err(GreaseError::BadRequest(format!(
+    #             "Event with id {} is not a public event.",
+    #             event.id
+    #         )));
+    #     }
+
+    #     let calendar_url = Self::build_calendar_url(&event, &gig);
+    #     Ok(PublicEvent {
+    #         id: event.id,
+    #         name: event.name,
+    #         time: gig.performance_time,
+    #         location: event.location.unwrap_or_default(),
+    #         summary: gig.summary.unwrap_or_default(),
+    #         description: gig.description.unwrap_or_default(),
+    #         invite: calendar_url,
+    #     })
+    # }
+
+    # def self.build_calendar_url(event)
+    #   gig = event.gig || raise "All public events must have gigs"
+
+    # fn build_calendar_event(event: &Event, gig: &Gig) -> CalEvent {
+    #     let end_time = event
+    #         .release_time
+    #         .unwrap_or(gig.performance_time + Duration::hours(1));
+    #     let location = event.location.clone().unwrap_or_default();
+
+    #     CalEvent::new()
+    #         .summary(&event.name)
+    #         .description(&gig.summary.clone().unwrap_or_default())
+    #         .starts(Utc.from_local_datetime(&gig.performance_time).unwrap())
+    #         .ends(Utc.from_local_datetime(&end_time).unwrap())
+    #         .append_property(Property::new("LOCATION", &location).done())
+    #         .done()
+    # }
+
+    # fn build_calendar(event: &Event, gig: &Gig) -> Calendar {
+    #     let calendar_event = Self::build_calendar_event(event, gig);
+
+    #     Calendar::from_iter(vec![calendar_event])
+    # }
+
+    # fn build_calendar_url(event: &Event, gig: &Gig) -> String {
+    #     let calendar = Self::build_calendar(event, gig);
+    #     let encoded_calendar = base64::encode_config(&calendar.to_string(), base64::URL_SAFE);
+
+    #     format!("data:text/calendar;base64,{}", encoded_calendar)
+    # }
+
+    # pub fn to_public(event: Event, gig: Gig) -> GreaseResult<PublicEvent> {
+    #     if !gig.public {
+    #         return Err(GreaseError::BadRequest(format!(
+    #             "Event with id {} is not a public event.",
+    #             event.id
+    #         )));
+    #     }
+
+    #     let calendar_url = Self::build_calendar_url(&event, &gig);
+    #     Ok(PublicEvent {
+    #         id: event.id,
+    #         name: event.name,
+    #         time: gig.performance_time,
+    #         location: event.location.unwrap_or_default(),
+    #         summary: gig.summary.unwrap_or_default(),
+    #         description: gig.description.unwrap_or_default(),
+    #         invite: calendar_url,
+    #     })
+    # }
+
+    @[GraphQL::Field]
+    def id : Int32
+      @id
+    end
+
+    @[GraphQL::Field]
+    def name : String
+      @name
+    end
+
+    @[GraphQL::Field(name: "time")]
+    def gql_time : String
+      @time.to_s
+    end
+
+    @[GraphQL::Field]
+    def location : String
+      @location
+    end
+
+    @[GraphQL::Field]
+    def summary : String
+      @summary
+    end
+
+    @[GraphQL::Field]
+    def description : String
+      @description
+    end
+
+    @[GraphQL::Field]
+    def invite : String
+      @invite
     end
   end
 end

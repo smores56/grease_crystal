@@ -8,6 +8,13 @@ module Models
   class Fee
     include GraphQL::ObjectType
 
+    DUES      = "dues"
+    LATE_DUES = "latedues"
+
+    DUES_NAME             = "Dues"
+    DUES_DESCRIPTION      = "Semesterly Dues"
+    LATE_DUES_DESCRIPTION = "Late Dues"
+
     class_getter table_name = "fee"
 
     DB.mapping({
@@ -32,6 +39,42 @@ module Models
       CONN.exec "UPDATE #{@@table_name} SET amount = ? WHERE name = ?", new_amount, @name
 
       @amount = new_amount
+    end
+
+    def self.charge_dues_for_semester
+      dues = with_name! DUES
+
+      members_who_have_not_paid = CONN.query_all "SELECT email FROM #{Member.table_name} \
+        WHERE email IN \
+          (SELECT member FROM #{ActiveSemester.table_name} WHERE semester = ?) \
+        AND email NOT IN \
+          (SELECT member FROM #{ClubTransaction.table_name} \
+            WHERE type = ? AND description = ?)",
+        Semester.current.name, DUES_NAME, DUES_DESCRIPTION, as: String
+
+      members_who_have_not_paid.each do |email|
+        CONN.exec "INSERT INTO #{ClubTransaction.table_name} \
+          (member, amount, type, description, semester) VALUES (?, ?, ?, ?, ?)",
+          email, dues.amount, DUES_NAME, DUES_DESCRIPTION, Semester.current.name
+      end
+    end
+
+    def self.charge_late_dues_for_semester
+      late_dues = with_name! LATE_DUES
+
+      members_who_have_not_paid = CONN.query_all "SELECT email FROM #{Member.table_name} \
+        WHERE email IN \
+          (SELECT member FROM #{ActiveSemester.table_name} WHERE semester = ?) \
+        AND email NOT IN \
+          (SELECT member FROM #{ClubTransaction.table_name} \
+            WHERE type = ? AND description = ?)",
+        Semester.current.name, DUES_NAME, DUES_DESCRIPTION, as: String
+
+      members_who_have_not_paid.each do |email|
+        CONN.exec "INSERT INTO #{ClubTransaction.table_name} \
+          (member, amount, type, description, semester) VALUES (?, ?, ?, ?, ?)",
+          email, late_dues.amount, DUES_NAME, LATE_DUES_DESCRIPTION, Semester.current.name
+      end
     end
 
     @[GraphQL::Field(description: "The short name of the fee")]
@@ -73,10 +116,6 @@ module Models
   @[GraphQL::Object]
   class ClubTransaction
     include GraphQL::ObjectType
-
-    DUES_NAME             = "Dues"
-    DUES_DESCRIPTION      = "Semesterly Dues"
-    LATE_DUES_DESCRIPTION = "Late Dues"
 
     class_getter table_name = "transaction"
 
@@ -134,7 +173,7 @@ module Models
 
     @[GraphQL::Field(description: "The email of the member this transaction was charged to")]
     def member : Models::Member
-      Member.with_email @member
+      Member.with_email! @member
     end
 
     @[GraphQL::Field(name: "time", description: "When this transaction was charged")]

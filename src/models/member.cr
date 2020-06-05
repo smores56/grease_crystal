@@ -4,6 +4,7 @@ require "uuid"
 require "crypto/bcrypt"
 require "./grades"
 require "../email"
+require "../permissions"
 
 Password = Crypto::Bcrypt::Password
 
@@ -38,13 +39,16 @@ module Models
     })
 
     def self.with_email(email)
-      member = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE email = ?", email, as: Member
-      member || raise "No member with email #{email}"
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE email = ?", email, as: Member
+    end
+
+    def self.with_email!(email)
+      (with_email email) || raise "No member with email #{email}"
     end
 
     def self.load_from_token(token)
       session = Session.for_token! token
-      Member.with_email session.member
+      Member.with_email! session.member
     end
 
     def self.all
@@ -59,7 +63,7 @@ module Models
     def self.valid_login?(form)
       pass_hash = CONN.query_one? "SELECT pass_hash FROM #{@@table_name} \
         WHERE email = ?", form.email, as: String
-      pass_hash && Crypto::Bcrypt::Password.new(raw_hash: pass_hash).verify(form.pass_hash)
+      pass_hash && Password.new(raw_hash: pass_hash).verify(form.pass_hash)
     end
 
     def is_active?
@@ -90,31 +94,40 @@ module Models
         form.phone_number, form.picture, form.passengers, form.location, form.on_campus,
         form.about, form.major, form.minor, form.hometown, form.arrived_at_tech,
         form.gateway_drug, form.conflicts, form.dietary_restrictions
+
+      Attendance.create_for_new_member form.email
     end
 
-    def self.register_for_current_semester(member, form)
-      ActiveSemester.create_for_member member, form, Semester.current
+    def register_for_current_semester(form)
+      ActiveSemester.create_for_member self, form, Semester.current
 
       CONN.exec "UPDATE #{@@table_name} \
         SET location = ?, on_campus = ?, conflicts = ?, dietary_restrictions = ? \
         WHERE email = ?", form.location, form.on_campus, form.conflicts,
-        form.dietary_restrictions, member.email
+        form.dietary_restrictions, @email
+
+      @location = form.location
+      @on_campus = form.on_campus
+      @conflicts = form.conflicts
+      @dietary_restrictions = form.dietary_restrictions
+
+      Attendance.create_for_new_member @email
     end
 
-    def self.update(member, form, as_self)
-      if member.email != form.email
+    def update(form, as_self)
+      if @email != form.email
         existing_email = CONN.query_one? "SELECT email FROM #{@@table_name} WHERE email = ?", form.email, as: String
         raise "Cannot change email to #{form.email}, as another member has that email" if existing_email
       end
 
-      pass_hash = if member_hash = form.pass_hash
+      pass_hash = if new_hash = form.pass_hash
                     if as_self
-                      Password.create(member_hash, cost: 10).to_s
+                      Password.create(new_hash, cost: 10).to_s
                     else
                       raise "Only members themselves can change their own passwords"
                     end
                   else
-                    member.pass_hash
+                    @pass_hash
                   end
 
       CONN.exec "UPDATE #{@@table_name} SET \
@@ -127,14 +140,28 @@ module Models
         form.about, form.major, form.minor, form.hometown, form.arrived_at_tech,
         form.gateway_drug, form.conflicts, form.dietary_restrictions, pass_hash
 
+      @email = email
+      @first_name = first_name
+      @preferred_name = preferred_name
+      @last_name = last_name
+      @phone_number = phone_number
+      @picture = picture
+      @passengers = passengers
+      @location = location
+      @about = about
+      @major = major
+      @minor = minor
+      @hometown = hometown
+      @arrived_at_tech = arrived_at_tech
+      @gateway_drug = gateway_drug
+      @conflicts = conflicts
+      @dietary_restrictions = dietary_restrictions
+
       ActiveSemester.update form.email, Semester.current, form.enrollment, form.section
     end
 
-    def self.delete(email)
-      # ensure member exists
-      Member.with_email email
-
-      CONN.exec "DELETE FROM #{@@table_name} WHERE email = ?", email
+    def delete
+      CONN.exec "DELETE FROM #{@@table_name} WHERE email = ?", @email
     end
 
     @[GraphQL::Field(description: "The member's email, which must be unique")]
@@ -228,7 +255,9 @@ module Models
     end
 
     @[GraphQL::Field(description: "The name of the semester they were active during")]
-    def semesters : Array(Models::ActiveSemester)
+    def semesters(context : UserContext) : Array(Models::ActiveSemester)
+      context.able_to! Permissions::VIEW_USER_PRIVATE_DETAILS unless @email == context.user!.email
+
       (ActiveSemester.all_for_member @email).sort_by &.semester
     end
 
@@ -253,12 +282,16 @@ module Models
     end
 
     @[GraphQL::Field(description: "The grades for the member in the given semester (default the current semester)")]
-    def grades : Models::Grades
+    def grades(context : UserContext) : Models::Grades
+      context.able_to! Permissions::VIEW_USER_PRIVATE_DETAILS unless @email == context.user!.email
+
       Grades.for_member self, Semester.current
     end
 
     @[GraphQL::Field(description: "All of the member's transactions for their entire time in Glee Club")]
-    def transaction : Array(Models::ClubTransaction)
+    def transactions(context : UserContext) : Array(Models::ClubTransaction)
+      context.able_to! Permissions::VIEW_USER_PRIVATE_DETAILS unless @email == context.user!.email
+
       ClubTransaction.for_member_during_semester @email, Semester.current.name
     end
   end
@@ -329,7 +362,7 @@ module Models
 
     @[GraphQL::Field(description: "The grades for the member in the given semester")]
     def grades : Models::Grades
-      Grades.for_member (Member.with_email @member), (Semester.with_name! @semester)
+      Grades.for_member (Member.with_email! @member), (Semester.with_name! @semester)
     end
 
     @[GraphQL::Field]

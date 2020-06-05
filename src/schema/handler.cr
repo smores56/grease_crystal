@@ -4,37 +4,39 @@ require "graphql"
 require "./query"
 require "./mutation"
 
-def graphql_response(request)
-  schema = GraphQL::Schema.new Query.new, Mutation.new
+module Grease
+  def self.graphql_response(request)
+    schema = GraphQL::Schema.new Query.new, Mutation.new
 
-  body = request.body || raise "JSON body is required"
-  json = JSON.parse body
+    body = request.body || raise "JSON body is required"
+    json = JSON.parse body
 
-  query = json["query"].as_s? || raise "query was not provided"
-  variables = json["variables"]?.try &.as_h
-  operation_name = json["operationName"]?.try &.as_s
+    query = json["query"].as_s? || raise "query was not provided"
+    variables = json["variables"]?.try &.as_h
+    operation_name = json["operationName"]?.try &.as_s
 
-  context = UserContext.new get_token(request, variables)
+    context = UserContext.new get_token(request, variables)
 
-  schema.execute(query, variables, operation_name, context)
-end
-
-def get_token(request, variables)
-  if token = request.headers["TOKEN"]?
-    token
-  elsif token = variables.try &.["token"]?
-    token.as_s
-  else
-    nil
+    schema.execute(query, variables, operation_name, context)
   end
-end
 
-class Graphiql
-  @url = "graphql"
+  def self.get_token(request, variables)
+    if token = request.headers["TOKEN"]?
+      token
+    elsif token = variables.try &.["token"]?
+      token.as_s
+    else
+      nil
+    end
+  end
 
-  ECR.def_to_s "templates/graphiql.ecr"
+  class Graphiql
+    @url = "graphql"
 
-  def self.html
-    Graphiql.new.to_s
+    ECR.def_to_s "templates/graphiql.html.ecr"
+
+    def self.html
+      Graphiql.new.to_s
+    end
   end
 end

@@ -1,6 +1,9 @@
-require "graphql"
+require "uri"
 require "mysql"
+require "graphql"
+
 require "./event"
+require "../utils"
 
 module Models
   @[GraphQL::Object]
@@ -261,6 +264,14 @@ module Models
       storage: {type: StorageType, converter: StorageTypeConverter},
     })
 
+    def self.with_name(name)
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE name = ?", name, as: MediaType
+    end
+
+    def self.with_name!(name)
+      (with_name name) || raise "No media type named #{name}"
+    end
+
     def self.all
       CONN.query_all "SELECT * FROM #{@@table_name} ORDER BY order ASC", as: MediaType
     end
@@ -298,8 +309,11 @@ module Models
     })
 
     def self.with_id(id)
-      link = CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: SongLink
-      link || raise "No song link with id #{id}"
+      CONN.query_one? "SELECT * FROM #{@@table_name} WHERE id = ?", id, as: SongLink
+    end
+
+    def self.with_id!(id)
+      (with_id id) || raise "No song link with id #{id}"
     end
 
     def self.for_song(song_id)
@@ -308,6 +322,54 @@ module Models
 
     def self.all
       CONN.query_all "SELECT * FROM #{@@table_name}", as: SongLink
+    end
+
+    def self.create(song_id, form)
+      encoded_target = if content = form.content
+                         file = Utils::FileUpload.new form.target, content
+                         file.upload
+                         URI.encode form.target
+                       else
+                         form.target
+                       end
+
+      CONN.exec "INSERT INTO #{@@table_name} (song, type, name, target) VALUES (?, ?, ?, ?)",
+        song_id, form.type, form.name, encoded_target
+
+      CONN.query_one "SELECT id FROM #{@@table_name} ORDER BY id DESC", as: Int32
+    end
+
+    def update(form)
+      media_type = MediaType.with_name! @type
+      new_target = if media_type.storage == MediaType::StorageType::LOCAL
+                     URI.encode form.target
+                   else
+                     form.target
+                   end
+
+      CONN.exec "UPDATE #{@@table_name} SET name = ?, target = ? WHERE id = ?",
+        form.name, new_target, @id
+
+      if @target != new_target && media_type.storage == MediaType::StorageType::LOCAL
+        old_path = Utils::MUSIC_BASE_PATH / @target
+        new_path = Utils::MUSIC_BASE_PATH / new_target
+
+        raise "Song link #{@name} has no associated file" unless File.exists? old_path
+        File.rename old_path.to_s, new_path.to_s
+      end
+
+      @name, @target = form.name, new_target
+    end
+
+    def delete
+      media_type = MediaType.with_name! @type
+
+      CONN.exec "DELETE FROM #{@@table_name} WHERE id = ?", @id
+
+      if media_type.storage = MediaType::StorageType::LOCAL
+        file_name = Utils::MUSIC_BASE_PATH / @target
+        File.delete file_name if File.exists? file_name
+      end
     end
 
     @[GraphQL::Field(description: "The ID of the song link")]
