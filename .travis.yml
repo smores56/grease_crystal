@@ -3,6 +3,6 @@ language: crystal
 cache: shards
 
 script:
-  - crystal build --no-codegen src/grease.cr
+  - crystal build --no-codegen --warnings none src/grease.cr
   - crystal bin/ameba.cr
   - crystal tool format --check
