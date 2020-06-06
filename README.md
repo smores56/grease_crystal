@@ -7,7 +7,8 @@ find the frontend (written in React + TypeScript) [here][frontend].
 
 This GraphQL API is written in [Crystal][crystal].
 
-_Note: If you are curious about the history of this project or why Crystal was the_ _language used, please read the [corresponding doc][why crystal]_.
+_Note: If you are curious about the history of this project or why Crystal was the_
+_language used, please read the [corresponding doc][why crystal]_.
 
 
 ## Usage
@@ -20,8 +21,8 @@ _/graphql_         | The GraphQL API itself
 _/graphiql_        | The GraphiQL page, for exploring the API
 _/upload_frontend_ | Upload archived build of the [frontend][frontend].
 
-You will access the live version of the GraphiQL instance running at
-https://gleeclub.gatech.edu/cgi-bin/grease/graphiql.
+You will be able to access the live version of the GraphiQL instance running at
+https://gleeclub.gatech.edu/cgi-bin/api/graphiql.
 
 <!-- TODO: move to present tense on deployment -->
 
