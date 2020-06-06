@@ -46,7 +46,10 @@ class Query
     Models::Event.for_semester Models::Semester.current.name
   end
 
-  # TODO: publicEvents: [PublicEvent!]!
+  @[GraphQL::Field]
+  def public_events : Array(Models::PublicEvent)
+    Models::PublicEvent.all_for_current_semester
+  end
 
   @[GraphQL::Field]
   def absence_requests(context : UserContext) : Array(Models::AbsenceRequest)

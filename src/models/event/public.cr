@@ -33,19 +33,19 @@ module Models
           io << "PRODID:ICALENDAR-RS\n"
           io << "CALSCALE:GREGORIAN\n"
           io << "BEGIN:VEVENT\n"
-          io << "DTSTAMP:" << Time.utc.to_s DATETIME_FORMAT << "\n"
+          io << "DTSTAMP:" << (Time.utc.to_s DATETIME_FORMAT) << "\n"
           io << "DESCRIPTION:" << (gig.summary || "") << "\n"
-          io << "DTEND:" << end_time.to_s DATETIME_FORMAT << "\n"
-          io << "DTSTART:" << event.call_time.to_s DATETIME_FORMAT << "\n"
-          io << "LOCATION:" << event.location << "\n"
+          io << "DTEND:" << (end_time.to_s DATETIME_FORMAT) << "\n"
+          io << "DTSTART:" << (event.call_time.to_s DATETIME_FORMAT) << "\n"
+          io << "LOCATION:" << (event.location || "") << "\n"
           io << "SUMMARY:" << (gig.description || "") << "\n"
           io << "UID:" << UUID.random << "\n"
           io << "END:VEVENT\n"
           io << "END:VCALENDAR\n"
         end
 
-        new event.id, event.name, event.call_time, event.location, gig.summary,
-          gig.description, "data:text/calendar;base64,#{Base64.encode calendar_event}"
+        new event.id, event.name, event.call_time, (event.location || ""), (gig.summary || ""),
+          (gig.description || ""), "data:text/calendar;base64,#{Base64.encode calendar_event}"
       end
     end
 
