@@ -1,7 +1,6 @@
-require "dotenv"
 require "graphql"
-require "mysql"
-require "../db"
+
+require "../../db"
 
 module Models
   @[GraphQL::Object]

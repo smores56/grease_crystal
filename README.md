@@ -15,7 +15,7 @@ _Note: If you are curious about the history of this project or why Crystal was t
 This API runs using the [CGI][cgi] interface, and exposes a few endpoints:
 
 Endpoint           | Purpose
-------------------:|:-------
+-------------------|--------
 _/graphql_         | The GraphQL API itself
 _/graphiql_        | The GraphiQL page, for exploring the API
 _/upload_frontend_ | Upload archived build of the [frontend][frontend].

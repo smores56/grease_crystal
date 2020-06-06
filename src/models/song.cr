@@ -326,7 +326,7 @@ module Models
 
     def self.create(song_id, form)
       encoded_target = if content = form.content
-                         file = Utils::FileUpload.new form.target, content
+                         file = Utils::FileUpload.new Path[form.target], content
                          file.upload
                          URI.encode form.target
                        else

@@ -1,8 +1,10 @@
 require "ecr"
 require "json"
 require "graphql"
-require "./query"
-require "./mutation"
+
+require "./utils"
+require "./schema/query"
+require "./schema/mutation"
 
 module Grease
   def self.graphql_response(request)
@@ -20,7 +22,7 @@ module Grease
     schema.execute(query, variables, operation_name, context)
   end
 
-  def self.get_token(request, variables)
+  def self.get_token(request, variables = nil)
     if token = request.headers["TOKEN"]?
       token
     elsif token = variables.try &.["token"]?
@@ -28,6 +30,13 @@ module Grease
     else
       nil
     end
+  end
+
+  def self.upload_frontend(request)
+    context = UserContext.new (get_token request)
+    context.logged_in!
+
+    Utils.update_frontend(request.body || IO::Memory.new 0)
   end
 
   class Graphiql

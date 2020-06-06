@@ -1,7 +1,8 @@
 require "graphql"
+
 require "./context"
-require "../models/input"
-require "../permissions"
+require "./input"
+require "../models/permissions/*"
 
 @[GraphQL::Object]
 class Mutation

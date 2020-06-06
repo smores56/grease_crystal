@@ -1,5 +1,5 @@
 require "graphql"
-require "./member"
+require "../models/member"
 
 module Input
   def self.parse_datetime(str, value_name)

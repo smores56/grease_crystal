@@ -1,17 +1,21 @@
 require "http/status"
+
+require "./db"
 require "./cgi"
-require "./schema/handler"
+require "./handlers"
 
 module Grease
   CGI.handle do |request|
-    # TODO: endpoint to upload frontend (as tar.gz)
     case request.path
-    when "/graphiql"
-      {Graphiql.html, "text/html", HTTP::Status::OK}
     when "/graphql"
       json = graphql_response request
       TRANSACTION.commit
       {json, "application/json", HTTP::Status::OK}
+    when "/graphiql"
+      {Graphiql.html, "text/html", HTTP::Status::OK}
+    when "/upload_frontend"
+      upload_frontend request
+      {"OK", "text/plain", HTTP::Status::OK}
     else
       {"Resource not found", "text/plain", HTTP::Status::NOT_FOUND}
     end
