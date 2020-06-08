@@ -53,13 +53,18 @@ module CGI
     headers
   end
 
-  def self.response_to_stdout(body, content_type, status)
-    STDOUT << "Status: #{status.code} #{status.description}\n"
-    STDOUT << "Content-type: #{content_type}\n\n"
-    STDOUT << body
+  def self.response_to_stdout(response : HTTP::Client::Response)
+    STDOUT << "Status: " << response.status.code << " " << response.status.description << "\n"
+    response.headers.each do |key, values|
+      values.each do |value|
+        STDOUT << key << ": " << value << "\n"
+      end
+    end
+
+    STDOUT << "\n" << response.body
   end
 
   def self.handle(&block)
-    CGI.response_to_stdout(*yield CGI.request_from_stdin)
+    response_to_stdout(yield request_from_stdin)
   end
 end

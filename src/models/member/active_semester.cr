@@ -1,9 +1,8 @@
 require "uuid"
 require "graphql"
 
-require "./grades"
 require "../../db"
-require "../../email"
+require "./grades"
 require "../permissions/constants"
 
 module Models

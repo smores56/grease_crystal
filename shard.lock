@@ -16,6 +16,10 @@ shards:
     github: gdotdesign/cr-dotenv
     version: 0.7.0
 
+  email:
+    github: arcage/crystal-email
+    version: 0.6.1
+
   graphql:
     gitlab: everbase/graphql
     commit: b0b2450962c816f092be98b8d5b39852ffb0d9d5

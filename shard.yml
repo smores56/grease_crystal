@@ -23,6 +23,8 @@ dependencies:
     github: crystal-lang/crystal-mysql
   crystar:
     github: naqvis/crystar
+  email:
+    github: arcage/crystal-email
   ameba:
     github: crystal-ameba/ameba
     version: ~> 0.12.0

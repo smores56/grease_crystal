@@ -44,7 +44,7 @@ module Models
       new_token = "#{UUID.random.to_s[0...32]}X#{Time.local.to_unix_ms}"
       Session.create email, new_token
 
-      Emails.reset_password email, "https://gleeclub.gatech.edu/glubhub/#/reset-password/#{new_token}"
+      Emails::ResetPassword.send email, new_token
     end
 
     def self.reset_password(token, pass_hash)

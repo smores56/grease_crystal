@@ -4,7 +4,6 @@ require "graphql"
 require "crypto/bcrypt"
 
 require "./grades/*"
-require "../../email"
 require "../permissions/*"
 require "./session"
 require "./active_semester"

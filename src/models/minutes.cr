@@ -1,6 +1,7 @@
 require "graphql"
 
 require "../db"
+require "../emails"
 
 module Models
   @[GraphQL::Object]

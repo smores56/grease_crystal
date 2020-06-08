@@ -6,21 +6,24 @@ require "./handlers"
 
 module Grease
   CGI.handle do |request|
-    case request.path
-    when "/graphql"
-      json = graphql_response request
-      TRANSACTION.commit
-      {json, "application/json", HTTP::Status::OK}
-    when "/graphiql"
-      {Graphiql.html, "text/html", HTTP::Status::OK}
-    when "/upload_frontend"
-      upload_frontend request
-      {"OK", "text/plain", HTTP::Status::OK}
+    if request.method == "OPTIONS"
+      cors
     else
-      {"Resource not found", "text/plain", HTTP::Status::NOT_FOUND}
+      case request.path
+      when "/graphql"
+        response = graphql_response request
+        TRANSACTION.commit
+        response
+      when "/graphiql"
+        Graphiql.response
+      when "/upload_frontend"
+        upload_frontend request
+      else
+        with_content_type "Resource not found", "text/plain", HTTP::Status::NOT_FOUND
+      end
     end
   rescue exception
     TRANSACTION.rollback
-    {exception.to_s, "text/plain", HTTP::Status::BAD_REQUEST}
+    with_content_type exception.to_s, "text/plain", HTTP::Status::BAD_REQUEST
   end
 end
