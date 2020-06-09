@@ -62,10 +62,10 @@ module Models
         (SELECT member FROM #{ActiveSemester.table_name} WHERE semester = ?)", semester_name, as: Member
     end
 
-    def self.valid_login?(form)
+    def self.valid_login?(email, given_pass_hash)
       pass_hash = CONN.query_one? "SELECT pass_hash FROM #{@@table_name} \
-        WHERE email = ?", form.email, as: String
-      pass_hash && Password.new(raw_hash: pass_hash).verify(form.pass_hash)
+        WHERE email = ?", email, as: String
+      pass_hash && Password.new(raw_hash: pass_hash).verify(given_pass_hash)
     end
 
     def is_active?

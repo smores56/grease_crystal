@@ -10,10 +10,10 @@ class Mutation
   include GraphQL::MutationType
 
   @[GraphQL::Field(description: "Gets a login token on successful login")]
-  def login(form : Input::LoginInfo) : String
-    raise "The given email or password is invalid" unless Models::Member.valid_login? form
+  def login(email : String, pass_hash : String) : String
+    raise "The given email or password is invalid" unless Models::Member.valid_login? email, pass_hash
 
-    Models::Session.get_or_generate_token form.email
+    Models::Session.get_or_generate_token email
   end
 
   @[GraphQL::Field(description: "Logs the member out")]
@@ -29,8 +29,8 @@ class Mutation
   end
 
   @[GraphQL::Field]
-  def reset_password(token : String, form : Input::PasswordReset) : Bool
-    Models::Session.reset_password token, form.pass_hash
+  def reset_password(token : String, pass_hash : String) : Bool
+    Models::Session.reset_password token, pass_hash
     true
   end
 

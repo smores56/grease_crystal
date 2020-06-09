@@ -98,12 +98,33 @@ module Models
     enum Type
       STATIC
       EVENT
+
+      def self.mapping
+        {
+          "STATIC" => STATIC,
+          "EVENT"  => EVENT,
+        }
+      end
+
+      def to_rs
+        Type.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(rs)
+        val = rs.read
+        permission_type = val.as?(String).try { |v| Type.mapping[v.upcase]? }
+        permission_type || raise "Invalid permission type returned from database: #{val}"
+      end
+
+      def self.parse(val)
+        Type.mapping[val]? || raise "Invalid permission type variant provided: #{val}"
+      end
     end
 
     DB.mapping({
       name:        String,
       description: String?,
-      type:        {type: Type, default: Type::STATIC},
+      type:        {type: Type, default: Type::STATIC, converter: Type},
     })
 
     def self.all

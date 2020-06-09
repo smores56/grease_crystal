@@ -143,30 +143,26 @@ module Models
       APPROVED
       DENIED
 
-      def self.parse(val)
-        case val
-        when "PENDING"
-          PENDING
-        when "APPROVED"
-          APPROVED
-        when "DENIED"
-          DENIED
-        else
-          raise "Invalid absence request state returned from db: #{val}"
-        end
+      def self.mapping
+        {
+          "PENDING"  => PENDING,
+          "APPROVED" => APPROVED,
+          "DENIED"   => DENIED,
+        }
       end
 
-      def self.from_rs(val)
-        case val
-        when "pending"
-          PENDING
-        when "approved"
-          APPROVED
-        when "denied"
-          DENIED
-        else
-          raise "Invalid absence request state returned from db: #{val}"
-        end
+      def to_rs
+        State.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(rs)
+        val = rs.read
+        state = val.as?(String).try { |v| State.mapping[v.upcase]? }
+        state || raise "Invalid absence request state returned from database: #{val}"
+      end
+
+      def self.parse(val)
+        State.mapping[val]? || raise "Invalid absence request state variant provided: #{val}"
       end
     end
 
@@ -199,7 +195,7 @@ module Models
       for_member_at_event! email, event_id
 
       CONN.exec "UPDATE #{@@table_name} SET state = ? WHERE event = ? AND member = ?",
-        state, event_id, email
+        state.to_rs, event_id, email
     end
 
     @[GraphQL::Field(description: "The member that requested an absence")]

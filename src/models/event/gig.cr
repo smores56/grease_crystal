@@ -87,6 +87,28 @@ module Models
       PENDING
       ACCEPTED
       DISMISSED
+
+      def self.mapping
+        {
+          "PENDING"   => PENDING,
+          "ACCEPTED"  => ACCEPTED,
+          "DISMISSED" => DISMISSED,
+        }
+      end
+
+      def to_rs
+        Status.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(rs)
+        val = rs.read
+        status = val.as?(String).try { |v| Status.mapping[v.upcase]? }
+        status || raise "Invalid gig request status returned from database: #{val}"
+      end
+
+      def self.parse(val)
+        Status.mapping[val]? || raise "Invalid gig request status variant provided: #{val}"
+      end
     end
 
     DB.mapping({
@@ -101,7 +123,7 @@ module Models
       start_time:    Time,
       location:      String,
       comments:      String?,
-      status:        {type: Status, default: Status::PENDING},
+      status:        {type: Status, default: Status::PENDING, converter: Status},
     })
 
     def self.with_id(id)
@@ -137,7 +159,7 @@ module Models
       elsif @status == Status::PENDING && status == Status::ACCEPTED && @event.nil?
         raise "Must create the event for the gig request first before marking it as accepted"
       else
-        CONN.exec "UPDATE #{@@table_name} SET status = ? WHERE id = ?", status, @id
+        CONN.exec "UPDATE #{@@table_name} SET status = ? WHERE id = ?", status.to_rs, @id
 
         @status = status
       end

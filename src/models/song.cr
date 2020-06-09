@@ -66,12 +66,24 @@ module Models
         Pitch.mapping.invert[self].downcase
       end
 
-      def self.from_rs(val)
-        Pitch.mapping[val.upcase]? || raise "Invalid pitch returned from database: #{val}"
+      def self.from_rs(rs, nillable? = false)
+        val = rs.read
+        return nil if val.nil? && nillable?
+        # There is a malformed pitch in the database, this handles that
+        return nil if val.as?(String) == ""
+
+        pitch = val.as?(String).try { |v| Pitch.mapping[v.upcase]? }
+        pitch || raise "Invalid pitch returned from database: #{val}"
       end
 
       def self.parse(val)
         Pitch.mapping[val]? || raise "Invalid pitch variant provided: #{val}"
+      end
+    end
+
+    class NillablePitchConverter
+      def self.from_rs(rs)
+        Pitch.from_rs(rs, nillable?: true)
       end
     end
 
@@ -91,12 +103,22 @@ module Models
         Mode.mapping.invert[self].downcase
       end
 
-      def self.from_rs(val)
-        Mode.mapping[val.upcase]? || raise "Invalid song mode returned from database: #{val}"
+      def self.from_rs(rs, nillable? = false)
+        val = rs.read
+        return nil if val.nil? && nillable?
+
+        mode = val.as?(String).try { |v| Mode.mapping[v.upcase]? }
+        mode || raise "Invalid song mode returned from database: #{val}"
       end
 
       def self.parse(val)
         Mode.mapping[val]? || raise "Invalid song mode variant provided: #{val}"
+      end
+    end
+
+    class NillableModeConverter
+      def self.from_rs(rs)
+        Mode.from_rs(rs, nillable?: true)
       end
     end
 
@@ -105,9 +127,9 @@ module Models
       title:          String,
       info:           String?,
       current:        {type: Bool, default: false},
-      key:            Models::Song::Pitch?,
-      starting_pitch: Models::Song::Pitch?,
-      mode:           Models::Song::Mode?,
+      key:            {type: Models::Song::Pitch?, converter: Models::Song::NillablePitchConverter},
+      starting_pitch: {type: Models::Song::Pitch?, converter: Models::Song::NillablePitchConverter},
+      mode:           {type: Models::Song::Mode?, converter: Models::Song::NillableModeConverter},
     })
 
     def self.all
@@ -243,25 +265,33 @@ module Models
     enum StorageType
       LOCAL
       REMOTE
-    end
 
-    class StorageTypeConverter
-      def self.from_rs(val)
-        case val
-        when "local"
-          StorageType::LOCAL
-        when "remote"
-          StorageType::REMOTE
-        else
-          raise "Invalid media storage type returned from db: #{val}"
-        end
+      def self.mapping
+        {
+          "LOCAL"  => LOCAL,
+          "REMOTE" => REMOTE,
+        }
+      end
+
+      def to_rs
+        StorageType.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(rs)
+        val = rs.read
+        storage_type = val.as?(String).try { |v| StorageType.mapping[v.upcase]? }
+        storage_type || raise "Invalid storage type returned from database: #{val}"
+      end
+
+      def self.parse(val)
+        StorageType.mapping[val]? || raise "Invalid storage type variant provided: #{val}"
       end
     end
 
     DB.mapping({
       name:    String,
       order:   Int32,
-      storage: {type: StorageType, converter: StorageTypeConverter},
+      storage: {type: StorageType, converter: StorageType},
     })
 
     def self.with_name(name)

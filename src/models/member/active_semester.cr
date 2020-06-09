@@ -17,22 +17,32 @@ module Models
       CLASS
       CLUB
 
+      def self.mapping
+        {
+          "CLASS" => CLASS,
+          "CLUB"  => CLUB,
+        }
+      end
+
+      def to_rs
+        Enrollment.mapping.invert[self].downcase
+      end
+
+      def self.from_rs(rs)
+        val = rs.read
+        enrollment = val.as?(String).try { |v| Enrollment.mapping[v.upcase]? }
+        enrollment || raise "Invalid enrollment returned from database: #{val}"
+      end
+
       def self.parse(val)
-        case val
-        when "CLASS"
-          CLASS
-        when "CLUB"
-          CLUB
-        else
-          raise "Unknown enrollment variant: #{val}"
-        end
+        Enrollment.mapping[val]? || raise "Invalid enrollment variant provided: #{val}"
       end
     end
 
     DB.mapping({
       member:     String,
       semester:   String,
-      enrollment: {type: Enrollment, default: Enrollment::CLUB},
+      enrollment: {type: Enrollment, default: Enrollment::CLUB, converter: Enrollment},
       section:    String?,
     })
 
@@ -51,7 +61,7 @@ module Models
       end
 
       CONN.exec "INSERT INTO #{@@table_name} (member, semester, enrollment, section)
-        VALUES (?, ?, ?, ?)", member.email, semester.name, form.enrollment, form.section
+        VALUES (?, ?, ?, ?)", member.email, semester.name, form.enrollment.to_rs, form.section
     end
 
     def self.update(email, semester_name, enrollment, section)
@@ -60,10 +70,10 @@ module Models
       if enrollment
         if active_semester
           CONN.exec "UPDATE #{@@table_name} SET enrollment = ?, section = ? \
-            WHERE member = ? AND semester = ?", enrollment, section, email, semester_name
+            WHERE member = ? AND semester = ?", enrollment.to_rs, section, email, semester_name
         else
           CONN.exec "INSERT INTO #{@@table_name} (member, semester, enrollment, section)
-            VALUES (?, ?, ?, ?)", email, semester_name, enrollment, section
+            VALUES (?, ?, ?, ?)", email, semester_name, enrollment.to_rs, section
         end
       elsif active_semester
         CONN.exec "DELETE FROM #{@@table_name} WHERE member = ? AND SEMESTER = ?", email, semester_name

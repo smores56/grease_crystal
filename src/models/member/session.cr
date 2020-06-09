@@ -51,14 +51,15 @@ module Models
       session = (Session.for_token token) || raise "No password reset request was found \
         for the given token. Please request another password reset."
 
-      time_requested = session.key.split('X')[1]?.try &.to_i.try { |ms| Time.unix_ms ms }
+      time_requested = session.key.split('X')[1]?.try &.to_i64.try { |ms| Time.unix_ms ms }
       if !time_requested || (time_requested.shift days: 1) < Time.local
         raise "Your token expired after 24 hours. Please request another password reset."
       end
 
       Session.remove_for session.member
       hash = Crypto::Bcrypt::Password.create(pass_hash, cost: 10)
-      CONN.exec "UPDATE #{Member.table_name} SET pass_hash = ? WHERE email = ?", hash, session.member
+      CONN.exec "UPDATE #{Member.table_name} SET pass_hash = ? WHERE email = ?",
+        hash.to_s, session.member
     end
   end
 end
