@@ -1,6 +1,6 @@
 require "ecr"
 require "log"
-require "email"
+# require "email"
 
 require "./models/member/**"
 
@@ -15,12 +15,12 @@ module Emails
     ECR.def_to_s "templates/forgot_password.html.ecr"
 
     def self.send(email, new_token)
-      EMail.send "localhost", log: (Log.for "*", :error) do
-        from DEFAULT_ADDRESS
-        to email
-        subject "Reset Your GlubHub Password"
-        message (new email, new_token).to_s
-      end
+      # EMail.send "localhost", log: (Log.for "*", Log::Severity::Error) do
+      #   from DEFAULT_ADDRESS
+      #   to email
+      #   subject "Reset Your GlubHub Password"
+      #   message (new email, new_token).to_s
+      # end
     end
   end
 end

@@ -139,18 +139,11 @@ class Mutation
   end
 
   @[GraphQL::Field]
-  def approve_absence_request(event_id : Int32, member : String, context : UserContext) : Models::AbsenceRequest
+  def respond_to_absence_request(event_id : Int32, member : String, approved : Bool, context : UserContext) : Models::AbsenceRequest
     context.able_to! Permissions::PROCESS_ABSENCE_REQUESTS
 
-    Models::AbsenceRequest.set_state event_id, member, Models::AbsenceRequest::State::APPROVED
-    Models::AbsenceRequest.for_member_at_event! member, event_id
-  end
-
-  @[GraphQL::Field]
-  def deny_absence_request(event_id : Int32, member : String, context : UserContext) : Models::AbsenceRequest
-    context.able_to! Permissions::PROCESS_ABSENCE_REQUESTS
-
-    Models::AbsenceRequest.set_state event_id, member, Models::AbsenceRequest::State::DENIED
+    state = approved ? Models::AbsenceRequest::State::APPROVED : Models::AbsenceRequest::State::DENIED
+    Models::AbsenceRequest.set_state event_id, member, state
     Models::AbsenceRequest.for_member_at_event! member, event_id
   end
 

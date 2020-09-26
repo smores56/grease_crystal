@@ -1,6 +1,6 @@
 require "base64"
 require "crystar"
-require "gzip"
+require "compress/gzip"
 require "file_utils"
 
 module Utils
@@ -24,7 +24,7 @@ module Utils
   end
 
   def self.update_frontend(archive)
-    Gzip::Reader.open archive do |gzip|
+    Compress::Gzip::Reader.open archive do |gzip|
       Crystar::Reader.open gzip do |tar|
         tar.each_entry do |entry|
           # remove first segment since archive includes build/ folder

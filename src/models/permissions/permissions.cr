@@ -208,9 +208,9 @@ module Models
     end
 
     def self.for_member(email)
-      CONN.query_all "SELECT m.permission, m.event_type FROM #{MemberRole.table_name} as m \
-        INNER JOIN #{RolePermission.table_name} as r ON m.role = r.role
-        WHERE m.member = ?", email, as: MemberPermission
+      CONN.query_all "SELECT permission as name, event_type FROM #{RolePermission.table_name} \
+        INNER JOIN #{MemberRole.table_name} ON #{RolePermission.table_name}.role = #{MemberRole.table_name}.role \
+        WHERE #{MemberRole.table_name}.member = ?", email, as: MemberPermission
     end
 
     @[GraphQL::Field]

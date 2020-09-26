@@ -11,6 +11,7 @@ module Grease
   def self.with_content_type(body, content_type, status = HTTP::Status::OK)
     headers = HTTP::Headers.new
     headers["Content-Type"] = content_type
+    headers["Access-Control-Allow-Origin"] = "*"
 
     HTTP::Client::Response.new status, body, headers: headers
   end
@@ -33,13 +34,7 @@ module Grease
   end
 
   def self.get_token(request, variables = nil)
-    if token = request.headers["TOKEN"]?
-      token
-    elsif token = variables.try &.["token"]?
-      token.as_s
-    else
-      nil
-    end
+    request.headers["token"]? || (variables.try &.["token"]?.try &.as_s?)
   end
 
   def self.upload_frontend(request)

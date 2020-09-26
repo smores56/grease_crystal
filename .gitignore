@@ -7,3 +7,4 @@ cgi-bin/
 music/
 .env
 grease
+backup.txt
