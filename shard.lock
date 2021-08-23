@@ -2,21 +2,21 @@ version: 2.0
 shards:
   crystar:
     git: https://github.com/naqvis/crystar.git
-    version: 0.1.8
+    version: 0.2.0
 
   db:
     git: https://github.com/crystal-lang/crystal-db.git
-    version: 0.9.0
+    version: 0.10.1
 
   dotenv:
-    git: https://github.com/gdotdesign/cr-dotenv.git
-    version: 0.7.0
+    git: https://github.com/xtokio/dotenv.git
+    version: 0.1.0+git.commit.f78b1cdb428e877abd8360aed7bb36676dbd6721
 
   graphql:
-    git: https://gitlab.com/everbase/graphql.git
-    version: 0.2.1
+    git: https://github.com/graphql-crystal/graphql.git
+    version: 0.3.1
 
   mysql:
     git: https://github.com/crystal-lang/crystal-mysql.git
-    version: 0.11.2
+    version: 0.13.0
 

@@ -14,9 +14,9 @@ license: MIT
 
 dependencies:
   dotenv:
-    github: gdotdesign/cr-dotenv
+    github: xtokio/dotenv
   graphql:
-    gitlab: everbase/graphql
+    github: graphql-crystal/graphql
   db:
     github: crystal-lang/crystal-db
   mysql:
