@@ -18,6 +18,8 @@ module Grease
         Graphiql.response
       when "/upload_frontend"
         upload_frontend request
+      when "/backup_db"
+        backup_db
       else
         with_content_type "Resource not found", "text/plain", HTTP::Status::NOT_FOUND
       end

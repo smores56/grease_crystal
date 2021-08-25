@@ -3,6 +3,7 @@ require "json"
 require "http"
 require "graphql"
 
+require "./db"
 require "./utils"
 require "./schema/query"
 require "./schema/mutation"
@@ -65,5 +66,24 @@ module Grease
     headers["Content-Type"] = "text/plain"
 
     HTTP::Client::Response.new HTTP::Status::OK, "OK", headers: headers
+  end
+
+  def self.backup_db
+    url = URI.new ENV["DATABASE_URL"]
+    dump = Process.new("mysqldump",
+      [
+        "--host",
+        url.host || "",
+        "--port",
+        url.port.to_s,
+        "--user",
+        url.host || "",
+        "--password",
+        url.password || "",
+      ],
+      output: Process::Redirect::Pipe
+    )
+
+    with_content_type dump.output.to_s, "text/plain"
   end
 end
