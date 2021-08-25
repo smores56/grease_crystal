@@ -13,8 +13,8 @@ shards:
     version: 1.0.0
 
   graphql:
-    git: https://gitlab.com/everbase/graphql.git
-    version: 0.2.1
+    git: https://github.com/graphql-crystal/graphql.git
+    version: 0.3.1
 
   mysql:
     git: https://github.com/crystal-lang/crystal-mysql.git
